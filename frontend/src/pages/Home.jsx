@@ -11,7 +11,8 @@ const Home = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetch('/api/players')
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+    fetch(`${API_BASE}/players`)
       .then(res => res.json())
       .then(data => {
         setPlayers(data);

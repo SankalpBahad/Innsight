@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Search, LayoutDashboard, Zap, TrendingUp, PieChart, Target } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const API_BASE = '/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 const AnalysisOverview = () => {
   const [players, setPlayers] = useState([]);
