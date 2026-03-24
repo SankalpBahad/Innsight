@@ -11,7 +11,7 @@ const Home = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetch('http://localhost:8000/players')
+    fetch('/api/players')
       .then(res => res.json())
       .then(data => {
         setPlayers(data);

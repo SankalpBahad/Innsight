@@ -6,7 +6,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = '/api';
 
 const Matchups = () => {
   const { name: playerName } = useParams();
