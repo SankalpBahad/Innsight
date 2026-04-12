@@ -33,6 +33,7 @@ const PlayerAnalytics = () => {
   const [wagonBalls, setWagonBalls] = useState([]);
   const [wicketShots, setWicketShots] = useState(null);
   const [phases, setPhases] = useState([]);
+  const [wpa, setWpa] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -51,7 +52,8 @@ const PlayerAnalytics = () => {
         fetch(`${API_BASE}/player/${playerName}/zones`).then(res => res.json()),
         fetch(`${API_BASE}/player/${playerName}/wicket-shots`).then(res => res.json()),
         fetch(`${API_BASE}/player/${playerName}/phases`).then(res => res.json()),
-      ]).then(([careerData, matchupsData, dismissalsData, zonesData, wicketShotsData, phasesData]) => {
+        fetch(`${API_BASE}/player/${playerName}/wpa`).then(res => res.json()),
+      ]).then(([careerData, matchupsData, dismissalsData, zonesData, wicketShotsData, phasesData, wpaData]) => {
         setCareer(careerData);
         setMatchups(matchupsData);
         setDismissals(dismissalsData);
@@ -59,6 +61,7 @@ const PlayerAnalytics = () => {
         setWagonBalls(zonesData?.balls ?? []);
         setWicketShots(wicketShotsData);
         setPhases(Array.isArray(phasesData) ? phasesData : []);
+        setWpa(wpaData);
         setLoading(false);
       }).catch(err => {
         console.error(err);
@@ -178,6 +181,59 @@ const PlayerAnalytics = () => {
                     </div>
                   );
                 })}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Win Probability Added */}
+          {wpa && (
+            <motion.div variants={itemVariants} className="glass-morphism rounded-[2.5rem] p-10">
+              <h3 className="text-xl font-display font-bold mb-2">Win Probability Added</h3>
+              <p className="text-slate-400 text-xs mb-8 uppercase tracking-widest font-bold opacity-60">Match-Winning Impact — WPA measures how much each ball shifts win probability</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    {[
+                      { label: 'Total WPA', value: wpa.total_wpa > 0 ? `+${wpa.total_wpa}` : wpa.total_wpa, color: wpa.total_wpa >= 0 ? 'text-emerald-400' : 'text-rose-400' },
+                      { label: 'Clutch WPA', value: wpa.clutch_wpa > 0 ? `+${wpa.clutch_wpa}` : wpa.clutch_wpa, sub: 'When team win% < 30', color: wpa.clutch_wpa >= 0 ? 'text-amber-400' : 'text-rose-400' },
+                    ].map(stat => (
+                      <div key={stat.label} className="bg-white/5 rounded-2xl p-5">
+                        <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">{stat.label}</p>
+                        <p className={`text-3xl font-display font-extrabold ${stat.color}`}>{stat.value}</p>
+                        {stat.sub && <p className="text-xs text-slate-500 mt-1">{stat.sub}</p>}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="bg-white/5 rounded-2xl p-5">
+                    <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4">WPA by Phase</p>
+                    <div className="space-y-3">
+                      {Object.entries(wpa.phase_wpa).map(([phase, val]) => (
+                        <div key={phase} className="flex items-center justify-between">
+                          <span className="text-sm text-slate-400 w-24">{phase}</span>
+                          <div className="flex-1 mx-3 h-2 bg-white/5 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${val >= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                              style={{ width: `${Math.min(Math.abs(val) / Math.max(...Object.values(wpa.phase_wpa).map(Math.abs)) * 100, 100)}%` }}
+                            />
+                          </div>
+                          <span className={`text-sm font-bold w-14 text-right ${val >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{val > 0 ? `+${val}` : val}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white/5 rounded-2xl p-5">
+                  <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4">Top Match Impacts</p>
+                  <div className="space-y-3">
+                    {wpa.top_matches?.map((m, i) => (
+                      <div key={m.match} className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-slate-500 w-5">#{i + 1}</span>
+                        <span className="text-xs text-slate-400 flex-1">Match {m.match}</span>
+                        <span className={`text-sm font-bold ${m.wpa >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{m.wpa > 0 ? `+${m.wpa}` : m.wpa}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </motion.div>
           )}

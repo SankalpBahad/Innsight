@@ -172,6 +172,44 @@ class DataProcessor:
             "balls": [{"x": int(b['wagonX']), "y": int(b['wagonY']), "runs": int(b['batruns'])} for b in balls]
         }
 
+    def get_wpa(self, player_name: str):
+        player_df = self.df[self.df['bat'] == player_name].copy()
+        if player_df.empty:
+            return None
+
+        wprob = pd.to_numeric(player_df['wprob'], errors='coerce')
+        player_df['wprob_num'] = wprob
+
+        # WPA = change in win probability ball-to-ball within same match+innings
+        player_df = player_df.sort_values(['p_match', 'inns', 'ball'])
+        player_df['wpa'] = player_df.groupby(['p_match', 'inns'])['wprob_num'].diff()
+        player_df['wpa'] = player_df['wpa'].fillna(0)
+
+        total_wpa = round(float(player_df['wpa'].sum()), 2)
+
+        # Clutch: WPA when team win prob < 30
+        clutch = player_df[player_df['wprob_num'] < 30]['wpa']
+        clutch_wpa = round(float(clutch.sum()), 2)
+
+        # Per match WPA
+        per_match = player_df.groupby('p_match')['wpa'].sum().reset_index()
+        per_match.columns = ['match', 'wpa']
+        per_match = per_match.sort_values('wpa', ascending=False)
+        top_matches = per_match.head(5).to_dict('records')
+
+        # WPA by phase
+        over_col = pd.to_numeric(player_df['over'], errors='coerce')
+        phase_wpa = {}
+        for phase, mask in [('Powerplay', over_col <= 6), ('Middle', (over_col > 6) & (over_col <= 15)), ('Death', over_col > 15)]:
+            phase_wpa[phase] = round(float(player_df[mask]['wpa'].sum()), 2)
+
+        return {
+            "total_wpa": total_wpa,
+            "clutch_wpa": clutch_wpa,
+            "phase_wpa": phase_wpa,
+            "top_matches": [{"match": int(m['match']), "wpa": round(float(m['wpa']), 2)} for m in top_matches],
+        }
+
     def get_phase_stats(self, player_name: str):
         player_df = self.df[self.df['bat'] == player_name]
         if player_df.empty:
