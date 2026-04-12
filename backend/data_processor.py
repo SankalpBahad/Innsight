@@ -219,29 +219,36 @@ class DataProcessor:
         player_df['wpa'] = player_df.groupby(['p_match', 'inns'])['wprob_num'].diff()
         player_df['wpa'] = player_df['wpa'].fillna(0)
 
-        total_wpa = round(float(player_df['wpa'].sum()), 2)
+        matches = int(player_df['p_match'].nunique())
 
-        # Clutch: WPA when team win prob < 30
-        clutch = player_df[player_df['wprob_num'] < 30]['wpa']
-        clutch_wpa = round(float(clutch.sum()), 2)
-
-        # Per match WPA
+        # Per-match WPA
         per_match = player_df.groupby('p_match')['wpa'].sum().reset_index()
         per_match.columns = ['match', 'wpa']
-        per_match = per_match.sort_values('wpa', ascending=False)
-        top_matches = per_match.head(5).to_dict('records')
 
-        # WPA by phase
+        avg_wpa = round(float(per_match['wpa'].mean()), 3) if len(per_match) > 0 else 0
+
+        # Clutch: when team win prob < 30
+        clutch_df   = player_df[player_df['wprob_num'] < 30]
+        clutch_matches = clutch_df['p_match'].nunique()
+        clutch_per_match = clutch_df.groupby('p_match')['wpa'].sum()
+        clutch_avg_wpa = round(float(clutch_per_match.mean()), 3) if len(clutch_per_match) > 0 else 0
+
+        top_matches = per_match.sort_values('wpa', ascending=False).head(5).to_dict('records')
+
+        # WPA by phase (average per match)
         over_col = pd.to_numeric(player_df['over'], errors='coerce')
         phase_wpa = {}
         for phase, mask in [('Powerplay', over_col <= 6), ('Middle', (over_col > 6) & (over_col <= 15)), ('Death', over_col > 15)]:
-            phase_wpa[phase] = round(float(player_df[mask]['wpa'].sum()), 2)
+            phase_per_match = player_df[mask].groupby('p_match')['wpa'].sum()
+            phase_wpa[phase] = round(float(phase_per_match.mean()), 3) if len(phase_per_match) > 0 else 0
 
         return {
-            "total_wpa": total_wpa,
-            "clutch_wpa": clutch_wpa,
-            "phase_wpa": phase_wpa,
-            "top_matches": [{"match": int(m['match']), "wpa": round(float(m['wpa']), 2)} for m in top_matches],
+            "avg_wpa":        avg_wpa,
+            "clutch_avg_wpa": clutch_avg_wpa,
+            "matches":        matches,
+            "clutch_matches": clutch_matches,
+            "phase_wpa":      phase_wpa,
+            "top_matches":    [{"match": int(m['match']), "wpa": round(float(m['wpa']), 2)} for m in top_matches],
         }
 
     def get_phase_stats(self, player_name: str):
