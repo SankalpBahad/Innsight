@@ -172,6 +172,42 @@ class DataProcessor:
             "balls": [{"x": int(b['wagonX']), "y": int(b['wagonY']), "runs": int(b['batruns'])} for b in balls]
         }
 
+    def get_phase_stats(self, player_name: str):
+        player_df = self.df[self.df['bat'] == player_name]
+        if player_df.empty:
+            return None
+
+        over_col = pd.to_numeric(player_df['over'], errors='coerce')
+        conditions = [over_col <= 6, (over_col > 6) & (over_col <= 15), over_col > 15]
+        labels = ['Powerplay', 'Middle', 'Death']
+
+        phases = []
+        for label, mask in zip(labels, conditions):
+            group = player_df[mask]
+            runs = int(group['batruns'].sum())
+            balls = int(group['ballfaced'].sum())
+            outs = int(group['is_out'].sum())
+            fours = int(group['is_four'].sum())
+            sixes = int(group['is_six'].sum())
+            sr = round(runs / balls * 100, 2) if balls > 0 else 0
+            avg = round(runs / outs, 2) if outs > 0 else runs
+            dot_balls = int((group['batruns'] == 0).sum())
+            dot_pct = round(dot_balls / balls * 100, 2) if balls > 0 else 0
+            boundary_pct = round((fours + sixes) / balls * 100, 2) if balls > 0 else 0
+            phases.append({
+                "phase": label,
+                "runs": runs,
+                "balls": balls,
+                "outs": outs,
+                "fours": fours,
+                "sixes": sixes,
+                "strike_rate": sr,
+                "average": avg,
+                "dot_pct": dot_pct,
+                "boundary_pct": boundary_pct,
+            })
+        return phases
+
     def get_wicket_shots(self, player_name: str):
         player_df = self.df[self.df['bat'] == player_name]
         if player_df.empty:

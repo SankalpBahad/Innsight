@@ -53,6 +53,13 @@ async def get_zones(name: str):
         return []
     return zones
 
+@app.get("/player/{name}/phases")
+async def get_phases(name: str):
+    data = processor.get_phase_stats(name)
+    if not data:
+        raise HTTPException(status_code=404, detail="Player not found")
+    return data
+
 @app.get("/player/{name}/wicket-shots")
 async def get_wicket_shots(name: str):
     data = processor.get_wicket_shots(name)

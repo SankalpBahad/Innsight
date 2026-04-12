@@ -32,6 +32,7 @@ const PlayerAnalytics = () => {
   const [zones, setZones] = useState([]);
   const [wagonBalls, setWagonBalls] = useState([]);
   const [wicketShots, setWicketShots] = useState(null);
+  const [phases, setPhases] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -49,13 +50,15 @@ const PlayerAnalytics = () => {
         fetch(`${API_BASE}/player/${playerName}/dismissals`).then(res => res.json()),
         fetch(`${API_BASE}/player/${playerName}/zones`).then(res => res.json()),
         fetch(`${API_BASE}/player/${playerName}/wicket-shots`).then(res => res.json()),
-      ]).then(([careerData, matchupsData, dismissalsData, zonesData, wicketShotsData]) => {
+        fetch(`${API_BASE}/player/${playerName}/phases`).then(res => res.json()),
+      ]).then(([careerData, matchupsData, dismissalsData, zonesData, wicketShotsData, phasesData]) => {
         setCareer(careerData);
         setMatchups(matchupsData);
         setDismissals(dismissalsData);
         setZones(zonesData?.zones ?? zonesData ?? []);
         setWagonBalls(zonesData?.balls ?? []);
         setWicketShots(wicketShotsData);
+        setPhases(Array.isArray(phasesData) ? phasesData : []);
         setLoading(false);
       }).catch(err => {
         console.error(err);
@@ -145,6 +148,39 @@ const PlayerAnalytics = () => {
               </motion.div>
             ))}
           </div>
+
+          {/* Phase Analysis */}
+          {phases.length > 0 && (
+            <motion.div variants={itemVariants} className="glass-morphism rounded-[2.5rem] p-10">
+              <h3 className="text-xl font-display font-bold mb-2">Phase Intelligence</h3>
+              <p className="text-slate-400 text-xs mb-8 uppercase tracking-widest font-bold opacity-60">Powerplay · Middle · Death</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {phases.map((p) => {
+                  const phaseColor = p.phase === 'Powerplay' ? 'indigo' : p.phase === 'Middle' ? 'emerald' : 'rose';
+                  const colorMap = { indigo: { bg: 'bg-indigo-500/10', text: 'text-indigo-400', bar: 'bg-indigo-500' }, emerald: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', bar: 'bg-emerald-500' }, rose: { bg: 'bg-rose-500/10', text: 'text-rose-400', bar: 'bg-rose-500' } };
+                  const c = colorMap[phaseColor];
+                  return (
+                    <div key={p.phase} className={`rounded-2xl p-6 ${c.bg} space-y-4`}>
+                      <p className={`text-xs font-extrabold uppercase tracking-widest ${c.text}`}>{p.phase}</p>
+                      <div className="grid grid-cols-2 gap-y-3 text-sm">
+                        <span className="text-slate-400">Runs</span><span className="font-bold text-right">{p.runs}</span>
+                        <span className="text-slate-400">Balls</span><span className="font-bold text-right">{p.balls}</span>
+                        <span className="text-slate-400">SR</span><span className={`font-extrabold text-right ${c.text}`}>{p.strike_rate}</span>
+                        <span className="text-slate-400">Average</span><span className="font-bold text-right">{p.average}</span>
+                        <span className="text-slate-400">4s / 6s</span><span className="font-bold text-right">{p.fours} / {p.sixes}</span>
+                        <span className="text-slate-400">Dot %</span><span className="font-bold text-right">{p.dot_pct}%</span>
+                        <span className="text-slate-400">Boundary %</span><span className="font-bold text-right">{p.boundary_pct}%</span>
+                      </div>
+                      <div>
+                        <div className="flex justify-between text-xs text-slate-500 mb-1"><span>Boundary %</span><span>{p.boundary_pct}%</span></div>
+                        <div className="h-1.5 bg-white/5 rounded-full"><div className={`h-full ${c.bar} rounded-full`} style={{ width: `${Math.min(p.boundary_pct * 2, 100)}%` }} /></div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Strike Rate Mastery */}
