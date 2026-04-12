@@ -52,9 +52,10 @@ class DataProcessor:
         if player_df.empty:
             return None
 
-        # Stats by bowl_kind (Pace/Spin)
+        # Stats by bowl_kind (Pace/Spin only)
         matchups = []
-        for kind, group in player_df.groupby('bowl_kind'):
+        filtered_df = player_df[player_df['bowl_kind'].isin(['pace bowler', 'spin bowler'])]
+        for kind, group in filtered_df.groupby('bowl_kind'):
             runs = int(group['batruns'].sum())
             balls = int(group['ballfaced'].sum())
             outs = int(group['is_out'].sum())
