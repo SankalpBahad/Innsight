@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { TrendingUp, Award, Zap, ChevronRight } from 'lucide-react';
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 const PlayerCard = ({ name, delay = 0 }) => {
   const [stats, setStats] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetch(`http://localhost:8000/player/${encodeURIComponent(name)}/career`)
+    fetch(`${API_BASE}/player/${encodeURIComponent(name)}/career`)
       .then(res => res.json())
       .then(data => setStats(data));
   }, [name]);
