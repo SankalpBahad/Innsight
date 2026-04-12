@@ -18,6 +18,7 @@ function cn(...inputs) {
 }
 
 import { useParams, useNavigate } from 'react-router-dom';
+import WagonWheel from '../components/WagonWheel';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -29,6 +30,7 @@ const PlayerAnalytics = () => {
   const [matchups, setMatchups] = useState(null);
   const [dismissals, setDismissals] = useState([]);
   const [zones, setZones] = useState([]);
+  const [wagonBalls, setWagonBalls] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -49,7 +51,8 @@ const PlayerAnalytics = () => {
         setCareer(careerData);
         setMatchups(matchupsData);
         setDismissals(dismissalsData);
-        setZones(zonesData);
+        setZones(zonesData?.zones ?? zonesData ?? []);
+        setWagonBalls(zonesData?.balls ?? []);
         setLoading(false);
       }).catch(err => {
         console.error(err);
@@ -210,27 +213,14 @@ const PlayerAnalytics = () => {
             </motion.div>
 
             {/* Wagon Wheel */}
-            <motion.div 
-              variants={itemVariants} 
+            <motion.div
+              variants={itemVariants}
               className="lg:col-span-4 glass-morphism rounded-[2.5rem] p-10 flex flex-col"
             >
-              <h3 className="text-xl font-display font-bold mb-2">Scoring Hotzones</h3>
-              <p className="text-slate-400 text-xs mb-8 uppercase tracking-widest font-bold opacity-60">Field Sector Dominance</p>
-              <div className="flex-1 flex items-center justify-center min-h-[300px]">
-                <ResponsiveContainer width="100%" height={320}>
-                  <RadarChart cx="50%" cy="50%" outerRadius="75%" data={zones}>
-                    <PolarGrid stroke="#222" />
-                    <PolarAngleAxis dataKey="zone" tick={{ fill: '#666', fontSize: 10, fontWeight: 700 }} />
-                    <Radar
-                      name="Runs"
-                      dataKey="runs"
-                      stroke="#10b981"
-                      fill="#10b981"
-                      fillOpacity={0.4}
-                    />
-                    <Tooltip contentStyle={{ backgroundColor: '#0f0f12', border: 'none', borderRadius: '12px' }} />
-                  </RadarChart>
-                </ResponsiveContainer>
+              <h3 className="text-xl font-display font-bold mb-2">Wagon Wheel</h3>
+              <p className="text-slate-400 text-xs mb-6 uppercase tracking-widest font-bold opacity-60">Scoring Map — 500 ball sample</p>
+              <div className="flex-1 flex items-center justify-center">
+                <WagonWheel balls={wagonBalls} />
               </div>
             </motion.div>
           </div>

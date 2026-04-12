@@ -150,7 +150,27 @@ class DataProcessor:
             return None
 
         zones = player_df.groupby('wagonZone')['batruns'].sum().to_dict()
-        return [{"zone": k, "runs": int(v)} for k, v in zones.items()]
+        zone_list = [{"zone": k, "runs": int(v)} for k, v in zones.items()]
+
+        # Individual ball coordinates for wagon wheel rendering
+        wagon_df = player_df[
+            (pd.to_numeric(player_df['wagonX'], errors='coerce').fillna(0) != 0) &
+            (pd.to_numeric(player_df['wagonY'], errors='coerce').fillna(0) != 0)
+        ][['wagonX', 'wagonY', 'batruns']].dropna().copy()
+
+        wagon_df['wagonX'] = pd.to_numeric(wagon_df['wagonX'], errors='coerce')
+        wagon_df['wagonY'] = pd.to_numeric(wagon_df['wagonY'], errors='coerce')
+        balls = wagon_df.to_dict('records')
+
+        if len(balls) > 500:
+            import random
+            random.seed(42)
+            balls = random.sample(balls, 500)
+
+        return {
+            "zones": zone_list,
+            "balls": [{"x": int(b['wagonX']), "y": int(b['wagonY']), "runs": int(b['batruns'])} for b in balls]
+        }
 
     def get_graph_data(self, player_name: str):
         player_df = self.df[self.df['bat'] == player_name]
