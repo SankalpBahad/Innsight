@@ -234,10 +234,50 @@ const PlayerAnalytics = () => {
               </div>
             </motion.div>
           </div>
+          {/* Bowl Style Breakdown */}
+          <motion.div variants={itemVariants} className="glass-morphism rounded-[2.5rem] p-10">
+            <h3 className="text-xl font-display font-bold mb-2">Style Matchup Matrix</h3>
+            <p className="text-slate-400 text-xs mb-8 uppercase tracking-widest font-bold opacity-60">Performance vs Every Bowling Style</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-white/5 text-slate-500 text-xs font-bold uppercase tracking-widest">
+                    <th className="pb-4 px-4">Style</th>
+                    <th className="pb-4 px-4 text-center">Balls</th>
+                    <th className="pb-4 px-4 text-center">Runs</th>
+                    <th className="pb-4 px-4 text-center">SR</th>
+                    <th className="pb-4 px-4 text-center">Average</th>
+                    <th className="pb-4 px-4 text-center">Dismissal %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {matchups?.by_style?.map((s) => (
+                    <tr key={s.style} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                      <td className="py-4 px-4 font-bold text-primary">{s.style}</td>
+                      <td className="py-4 px-4 text-center text-slate-400">{s.balls}</td>
+                      <td className="py-4 px-4 text-center font-bold">{s.runs}</td>
+                      <td className="py-4 px-4 text-center">
+                        <span className={`font-bold ${s.strike_rate >= 130 ? 'text-emerald-400' : s.strike_rate >= 100 ? 'text-amber-400' : 'text-red-400'}`}>
+                          {s.strike_rate}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-center font-semibold">{s.average}</td>
+                      <td className="py-4 px-4 text-center">
+                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${s.dismissal_rate > 2 ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'}`}>
+                          {s.dismissal_rate}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Dismissals - Specialized Card */}
-            <motion.div 
-              variants={itemVariants} 
+            <motion.div
+              variants={itemVariants}
               className="lg:col-span-12 glass-morphism rounded-[2.5rem] p-10 flex flex-col"
             >
               <h3 className="text-xl font-display font-bold mb-2">Technical Flaws</h3>
