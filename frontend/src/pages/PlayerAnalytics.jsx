@@ -34,6 +34,7 @@ const PlayerAnalytics = () => {
   const [wicketShots, setWicketShots] = useState(null);
   const [phases, setPhases] = useState([]);
   const [wpa, setWpa] = useState(null);
+  const [bowling, setBowling] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -53,7 +54,8 @@ const PlayerAnalytics = () => {
         fetch(`${API_BASE}/player/${playerName}/wicket-shots`).then(res => res.json()),
         fetch(`${API_BASE}/player/${playerName}/phases`).then(res => res.json()),
         fetch(`${API_BASE}/player/${playerName}/wpa`).then(res => res.json()),
-      ]).then(([careerData, matchupsData, dismissalsData, zonesData, wicketShotsData, phasesData, wpaData]) => {
+        fetch(`${API_BASE}/player/${playerName}/bowling`).then(res => res.ok ? res.json() : null),
+      ]).then(([careerData, matchupsData, dismissalsData, zonesData, wicketShotsData, phasesData, wpaData, bowlingData]) => {
         setCareer(careerData);
         setMatchups(matchupsData);
         setDismissals(dismissalsData);
@@ -62,6 +64,7 @@ const PlayerAnalytics = () => {
         setWicketShots(wicketShotsData);
         setPhases(Array.isArray(phasesData) ? phasesData : []);
         setWpa(wpaData);
+        setBowling(bowlingData);
         setLoading(false);
       }).catch(err => {
         console.error(err);
@@ -495,6 +498,225 @@ const PlayerAnalytics = () => {
                 </div>
               </div>
             </motion.div>
+          )}
+
+          {/* ── BOWLING INTELLIGENCE ── */}
+          {bowling && (
+            <>
+              {/* Divider */}
+              <motion.div variants={itemVariants} className="flex items-center gap-4 pt-4">
+                <div className="flex-1 h-px bg-white/5" />
+                <span className="text-xs font-extrabold uppercase tracking-[0.3em] text-slate-500">Bowling Intelligence</span>
+                <div className="flex-1 h-px bg-white/5" />
+              </motion.div>
+
+              {/* Career bowling summary */}
+              <motion.div variants={itemVariants} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                {[
+                  { label: 'Wickets',    value: bowling.career.wickets,     color: 'text-indigo-400' },
+                  { label: 'Economy',    value: bowling.career.economy,     color: 'text-emerald-400' },
+                  { label: 'Average',    value: bowling.career.average,     color: 'text-amber-400' },
+                  { label: 'Bowl SR',    value: bowling.career.bowling_sr ?? '—', color: 'text-purple-400' },
+                  { label: 'Dot %',      value: `${bowling.career.dot_pct}%`, color: 'text-sky-400' },
+                  { label: 'Matches',    value: bowling.career.matches,     color: 'text-slate-300' },
+                ].map(s => (
+                  <div key={s.label} className="glass-morphism rounded-2xl p-5 flex flex-col gap-1">
+                    <p className="text-xs font-bold uppercase tracking-widest text-slate-500">{s.label}</p>
+                    <p className={`text-3xl font-display font-extrabold ${s.color}`}>{s.value}</p>
+                  </div>
+                ))}
+              </motion.div>
+
+              {/* Phase economy + RHB/LHB */}
+              <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+                {/* Phase breakdown */}
+                <div className="glass-morphism rounded-[2rem] p-8">
+                  <h3 className="font-display font-bold text-lg mb-6">Phase-wise Economy</h3>
+                  <div className="space-y-5">
+                    {bowling.phases?.map(p => {
+                      const c = p.phase === 'Powerplay' ? 'bg-indigo-500' : p.phase === 'Middle' ? 'bg-emerald-500' : 'bg-rose-500';
+                      const tc = p.phase === 'Powerplay' ? 'text-indigo-400' : p.phase === 'Middle' ? 'text-emerald-400' : 'text-rose-400';
+                      const maxEcon = 12;
+                      return (
+                        <div key={p.phase}>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className={`font-extrabold uppercase tracking-wider ${tc}`}>{p.phase}</span>
+                            <span className="text-slate-400">{p.balls}b · {p.wickets}w · Dot {p.dot_pct}%</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 h-2.5 bg-white/5 rounded-full overflow-hidden">
+                              <div className={`h-full ${c} rounded-full`} style={{ width: `${Math.min(p.economy / maxEcon * 100, 100)}%` }} />
+                            </div>
+                            <span className={`text-sm font-extrabold w-12 text-right ${tc}`}>{p.economy}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* RHB vs LHB */}
+                <div className="glass-morphism rounded-[2rem] p-8">
+                  <h3 className="font-display font-bold text-lg mb-6">vs RHB &amp; LHB</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {['RHB', 'LHB'].map(hand => {
+                      const h = bowling.vs_hand?.[hand];
+                      if (!h) return null;
+                      const col = hand === 'RHB' ? { text: 'text-indigo-400', bg: 'bg-indigo-500/10' } : { text: 'text-emerald-400', bg: 'bg-emerald-500/10' };
+                      return (
+                        <div key={hand} className={`rounded-2xl p-5 ${col.bg} space-y-3`}>
+                          <p className={`text-sm font-extrabold uppercase tracking-wider ${col.text}`}>{hand}</p>
+                          <div className="grid grid-cols-2 gap-y-2 text-xs">
+                            <span className="text-slate-400">Balls</span>       <span className="font-bold text-right">{h.balls}</span>
+                            <span className="text-slate-400">Wickets</span>     <span className={`font-extrabold text-right ${col.text}`}>{h.wickets}</span>
+                            <span className="text-slate-400">Economy</span>     <span className="font-bold text-right">{h.economy}</span>
+                            <span className="text-slate-400">Average</span>     <span className="font-bold text-right">{h.average}</span>
+                            <span className="text-slate-400">SR conceded</span><span className="font-bold text-right">{h.sr_conceded}</span>
+                            <span className="text-slate-400">Dot %</span>       <span className="font-bold text-right">{h.dot_pct}%</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Wicket types + wicket shots */}
+              <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+                {/* Wicket types pie/bars */}
+                <div className="glass-morphism rounded-[2rem] p-8">
+                  <h3 className="font-display font-bold text-lg mb-6">Wicket Types</h3>
+                  <div className="space-y-2">
+                    {bowling.wicket_types?.map(w => {
+                      const max = bowling.wicket_types[0]?.count || 1;
+                      return (
+                        <div key={w.type} className="flex items-center gap-3">
+                          <span className="text-xs font-medium text-slate-400 w-32 capitalize">{w.type}</span>
+                          <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                            <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${(w.count / max) * 100}%` }} />
+                          </div>
+                          <span className="text-xs font-bold text-indigo-400 w-6 text-right">{w.count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Shots at dismissal */}
+                <div className="glass-morphism rounded-[2rem] p-8">
+                  <h3 className="font-display font-bold text-lg mb-6">Shots at Wicket</h3>
+                  <p className="text-slate-500 text-xs mb-5 uppercase tracking-widest">What batters play when dismissed</p>
+                  <div className="space-y-2">
+                    {bowling.wicket_shots?.map(s => {
+                      const max = bowling.wicket_shots[0]?.count || 1;
+                      return (
+                        <div key={s.shot} className="flex items-center gap-3">
+                          <span className="text-xs font-medium text-slate-400 w-44 truncate">{s.shot.replace(/_/g, ' ')}</span>
+                          <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                            <div className="h-full bg-rose-500 rounded-full" style={{ width: `${(s.count / max) * 100}%` }} />
+                          </div>
+                          <span className="text-xs font-bold text-rose-400 w-6 text-right">{s.count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Wicket-taking delivery profile */}
+              <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+                {/* Best length */}
+                <div className="glass-morphism rounded-[2rem] p-8">
+                  <h3 className="font-display font-bold text-lg mb-2">Wicket-Taking Length</h3>
+                  <p className="text-slate-500 text-xs mb-6 uppercase tracking-widest">Best lengths for wickets</p>
+                  <div className="space-y-2">
+                    {bowling.best_length?.map(l => {
+                      const max = bowling.best_length[0]?.wickets || 1;
+                      return (
+                        <div key={l.length} className="flex items-center gap-3">
+                          <span className="text-xs font-medium text-slate-400 w-40">{l.length.replace(/_/g, ' ')}</span>
+                          <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                            <div className="h-full bg-amber-500 rounded-full" style={{ width: `${(l.wickets / max) * 100}%` }} />
+                          </div>
+                          <span className="text-xs font-bold text-amber-400 w-6 text-right">{l.wickets}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Best line */}
+                <div className="glass-morphism rounded-[2rem] p-8">
+                  <h3 className="font-display font-bold text-lg mb-2">Wicket-Taking Line</h3>
+                  <p className="text-slate-500 text-xs mb-6 uppercase tracking-widest">Best lines for wickets</p>
+                  <div className="space-y-2">
+                    {bowling.best_line?.map(l => {
+                      const max = bowling.best_line[0]?.wickets || 1;
+                      return (
+                        <div key={l.line} className="flex items-center gap-3">
+                          <span className="text-xs font-medium text-slate-400 w-40">{l.line.replace(/_/g, ' ')}</span>
+                          <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(l.wickets / max) * 100}%` }} />
+                          </div>
+                          <span className="text-xs font-bold text-emerald-400 w-6 text-right">{l.wickets}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Length × Line wicket heatmap */}
+              {bowling.delivery_matrix?.length > 0 && (
+                <motion.div variants={itemVariants} className="glass-morphism rounded-[2rem] p-8">
+                  <h3 className="font-display font-bold text-lg mb-2">Wicket Delivery Heatmap</h3>
+                  <p className="text-slate-500 text-xs mb-6 uppercase tracking-widest">Length × Line — number of wickets</p>
+                  <div className="overflow-x-auto">
+                    <table className="text-xs">
+                      <thead>
+                        <tr className="border-b border-white/5">
+                          <th className="pb-3 pr-4 text-left text-slate-500 font-bold">Length \ Line</th>
+                          {[...new Set(bowling.delivery_matrix.map(d => d.line))].sort().map(line => (
+                            <th key={line} className="pb-3 px-3 text-center text-slate-500 font-bold whitespace-nowrap">{line.replace(/_/g, ' ')}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...new Set(bowling.delivery_matrix.map(d => d.length))].map(length => {
+                          const lines = [...new Set(bowling.delivery_matrix.map(d => d.line))].sort();
+                          const maxWkts = Math.max(...bowling.delivery_matrix.map(d => d.wickets));
+                          return (
+                            <tr key={length} className="border-b border-white/5">
+                              <td className="py-3 pr-4 font-medium text-slate-300 whitespace-nowrap">{length.replace(/_/g, ' ')}</td>
+                              {lines.map(line => {
+                                const cell = bowling.delivery_matrix.find(d => d.length === length && d.line === line);
+                                const w = cell?.wickets || 0;
+                                const intensity = w > 0 ? Math.min(w / maxWkts, 1) : 0;
+                                return (
+                                  <td key={line} className="py-3 px-3 text-center">
+                                    {w > 0 ? (
+                                      <span
+                                        className="inline-block w-8 h-8 rounded-lg text-white font-bold leading-8"
+                                        style={{ backgroundColor: `rgba(99,102,241,${0.15 + intensity * 0.8})` }}
+                                      >
+                                        {w}
+                                      </span>
+                                    ) : <span className="text-slate-700">—</span>}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </motion.div>
+              )}
+            </>
           )}
         </motion.main>
 

@@ -53,6 +53,13 @@ async def get_zones(name: str):
         return []
     return zones
 
+@app.get("/player/{name}/bowling")
+async def get_bowling(name: str):
+    data = processor.get_bowling_stats(name)
+    if not data:
+        raise HTTPException(status_code=404, detail="No bowling data found")
+    return data
+
 @app.get("/player/{name}/wpa")
 async def get_wpa(name: str):
     data = processor.get_wpa(name)

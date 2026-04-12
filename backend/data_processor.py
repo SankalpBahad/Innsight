@@ -280,6 +280,104 @@ class DataProcessor:
             })
         return phases
 
+    def get_bowling_stats(self, player_name: str):
+        bowl_df = self.df[self.df['bowl'] == player_name].copy()
+        if bowl_df.empty:
+            return None
+
+        over_col = pd.to_numeric(bowl_df['over'], errors='coerce')
+        bowl_df['over_num'] = over_col
+
+        balls   = int(bowl_df['ballfaced'].sum())
+        runs    = int(bowl_df['bowlruns'].sum())
+        wickets = int(bowl_df['is_out'].sum())
+        wides   = int(pd.to_numeric(bowl_df['wide'], errors='coerce').fillna(0).sum())
+        noballs = int(pd.to_numeric(bowl_df['noball'], errors='coerce').fillna(0).sum())
+        dots    = int((bowl_df['bowlruns'] == 0).sum())
+
+        economy  = round(runs / balls * 6, 2) if balls > 0 else 0
+        avg      = round(runs / wickets, 2) if wickets > 0 else runs
+        bowl_sr  = round(balls / wickets, 2) if wickets > 0 else None
+        dot_pct  = round(dots / balls * 100, 2) if balls > 0 else 0
+        matches  = int(bowl_df['p_match'].nunique())
+
+        # Phase breakdown
+        phases = []
+        for label, mask in [
+            ('Powerplay', over_col <= 6),
+            ('Middle',    (over_col > 6) & (over_col <= 15)),
+            ('Death',     over_col > 15),
+        ]:
+            g = bowl_df[mask]
+            gb = int(g['ballfaced'].sum())
+            gr = int(g['bowlruns'].sum())
+            gw = int(g['is_out'].sum())
+            gd = int((g['bowlruns'] == 0).sum())
+            phases.append({
+                "phase":   label,
+                "balls":   gb,
+                "runs":    gr,
+                "wickets": gw,
+                "economy": round(gr / gb * 6, 2) if gb > 0 else 0,
+                "dot_pct": round(gd / gb * 100, 2) if gb > 0 else 0,
+                "average": round(gr / gw, 2) if gw > 0 else gr,
+            })
+
+        # Wicket types
+        wicket_rows = bowl_df[bowl_df['is_out'] == 1]
+        wicket_types = wicket_rows['dismissal'].value_counts().to_dict()
+        wicket_type_list = [{"type": k, "count": int(v)} for k, v in wicket_types.items() if k]
+
+        # vs RHB / LHB
+        vs_hand = {}
+        for hand, hg in bowl_df[bowl_df['bat_hand'].isin(['RHB', 'LHB'])].groupby('bat_hand'):
+            hb = int(hg['ballfaced'].sum())
+            hr = int(hg['bowlruns'].sum())
+            hw = int(hg['is_out'].sum())
+            hd = int((hg['bowlruns'] == 0).sum())
+            vs_hand[hand] = {
+                "balls":    hb,
+                "runs":     hr,
+                "wickets":  hw,
+                "economy":  round(hr / hb * 6, 2) if hb > 0 else 0,
+                "average":  round(hr / hw, 2) if hw > 0 else hr,
+                "dot_pct":  round(hd / hb * 100, 2) if hb > 0 else 0,
+                "sr_conceded": round(hr / hb * 100, 2) if hb > 0 else 0,
+            }
+
+        # Wicket-taking deliveries: line × length (pure values only)
+        MIXED_LINES   = {''}
+        MIXED_LENGTHS = {''}
+        wkt_delivery = wicket_rows[
+            (wicket_rows['line'].notna()) & (~wicket_rows['line'].isin(MIXED_LINES)) &
+            (wicket_rows['length'].notna()) & (~wicket_rows['length'].isin(MIXED_LENGTHS))
+        ]
+        delivery_matrix = wkt_delivery.groupby(['length', 'line']).size().reset_index(name='wickets')
+        delivery_matrix_list = delivery_matrix.to_dict('records')
+
+        # Best wicket-taking length overall
+        best_length = wicket_rows[wicket_rows['length'].notna() & (wicket_rows['length'] != '')]['length'].value_counts().head(5).to_dict()
+        best_line   = wicket_rows[wicket_rows['line'].notna()   & (wicket_rows['line']   != '')]['line'].value_counts().head(5).to_dict()
+
+        # Wicket-taking shot type (what shot were batters playing)
+        wicket_shots = wicket_rows[wicket_rows['shot'].notna() & (wicket_rows['shot'] != '')]['shot'].value_counts().head(8).to_dict()
+
+        return {
+            "career": {
+                "balls": balls, "runs": runs, "wickets": wickets,
+                "economy": economy, "average": avg, "bowling_sr": bowl_sr,
+                "dot_pct": dot_pct, "wides": wides, "no_balls": noballs,
+                "matches": matches,
+            },
+            "phases":           phases,
+            "wicket_types":     wicket_type_list,
+            "vs_hand":          vs_hand,
+            "delivery_matrix":  delivery_matrix_list,
+            "best_length":      [{"length": k, "wickets": int(v)} for k, v in best_length.items()],
+            "best_line":        [{"line": k, "wickets": int(v)} for k, v in best_line.items()],
+            "wicket_shots":     [{"shot": k, "count": int(v)} for k, v in wicket_shots.items()],
+        }
+
     def get_wicket_shots(self, player_name: str):
         player_df = self.df[self.df['bat'] == player_name]
         if player_df.empty:
