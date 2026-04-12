@@ -50,89 +50,123 @@ class DataProcessor:
             "matches": int(player_df['p_match'].nunique())
         }
 
+    def _batter_score(self, sr, dismissal_rate):
+        """Composite: high SR + low dismissal rate = good"""
+        return sr - (dismissal_rate * 15)
+
+    def _bowler_score(self, economy, balls, wickets):
+        """Composite: low economy + high wicket rate = good"""
+        wicket_rate = (wickets / balls * 500) if balls > 0 else 0
+        return -economy + wicket_rate
+
     def get_matchups(self, player_name: str):
+        MIN_BALLS_BOWLER = 12
+        MIN_BALLS_STYLE  = 18
+
+        # ── AS BATTER ──────────────────────────────────────────────
         player_df = self.df[self.df['bat'] == player_name]
-        if player_df.empty:
-            return None
 
         # Stats by bowl_kind (Pace/Spin only)
-        matchups = []
+        by_type = []
         filtered_df = player_df[player_df['bowl_kind'].isin(['pace bowler', 'spin bowler'])]
         for kind, group in filtered_df.groupby('bowl_kind'):
-            runs = int(group['batruns'].sum())
+            runs  = int(group['batruns'].sum())
             balls = int(group['ballfaced'].sum())
-            outs = int(group['is_out'].sum())
-            sr = (runs / balls * 100) if balls > 0 else 0
-            avg = (runs / outs) if outs > 0 else runs
-            matchups.append({
-                "type": kind,
-                "runs": runs,
-                "balls": balls,
-                "outs": outs,
-                "strike_rate": round(sr, 2),
-                "average": round(avg, 2),
-            })
+            outs  = int(group['is_out'].sum())
+            sr    = (runs / balls * 100) if balls > 0 else 0
+            avg   = (runs / outs) if outs > 0 else runs
+            by_type.append({"type": kind, "runs": runs, "balls": balls,
+                            "outs": outs, "strike_rate": round(sr, 2), "average": round(avg, 2)})
 
-        # Stats by bowl_style (pure styles only), sorted by balls faced
+        # Stats by bowl_style
         style_df = player_df[~player_df['bowl_style'].isin(MIXED_STYLES)]
         by_style = []
         for style, group in style_df.groupby('bowl_style'):
-            runs = int(group['batruns'].sum())
+            runs  = int(group['batruns'].sum())
             balls = int(group['ballfaced'].sum())
-            outs = int(group['is_out'].sum())
-            sr = (runs / balls * 100) if balls > 0 else 0
-            avg = (runs / outs) if outs > 0 else runs
-            dismissal_rate = (outs / balls * 100) if balls > 0 else 0
-            by_style.append({
-                "style": style,
-                "runs": runs,
-                "balls": balls,
-                "outs": outs,
-                "strike_rate": round(sr, 2),
-                "average": round(avg, 2),
-                "dismissal_rate": round(dismissal_rate, 2)
-            })
+            outs  = int(group['is_out'].sum())
+            sr    = (runs / balls * 100) if balls > 0 else 0
+            avg   = (runs / outs) if outs > 0 else runs
+            dr    = (outs / balls * 100) if balls > 0 else 0
+            by_style.append({"style": style, "runs": runs, "balls": balls, "outs": outs,
+                             "strike_rate": round(sr, 2), "average": round(avg, 2),
+                             "dismissal_rate": round(dr, 2)})
         by_style = sorted(by_style, key=lambda x: x['balls'], reverse=True)
 
-        # Top 5 Bowlers by runs, with RHB/LHB career breakdown
-        top_bowlers = []
+        # All bowlers with min balls — good/bad splits
+        bowler_rows = []
         for bowler, group in player_df.groupby('bowl'):
-            runs = int(group['batruns'].sum())
             balls = int(group['ballfaced'].sum())
+            if balls < MIN_BALLS_BOWLER:
+                continue
+            runs = int(group['batruns'].sum())
             outs = int(group['is_out'].sum())
-            sr = (runs / balls * 100) if balls > 0 else 0
-            top_bowlers.append({
-                "bowler": bowler,
-                "runs": runs,
-                "balls": balls,
-                "outs": outs,
-                "strike_rate": round(sr, 2)
-            })
+            sr   = round(runs / balls * 100, 2) if balls > 0 else 0
+            avg  = round(runs / outs, 2) if outs > 0 else runs
+            dr   = round(outs / balls * 100, 2) if balls > 0 else 0
+            bowler_rows.append({"bowler": bowler, "runs": runs, "balls": balls,
+                                "outs": outs, "strike_rate": sr, "average": avg,
+                                "dismissal_rate": dr,
+                                "_score": self._batter_score(sr, dr)})
 
-        top_bowlers = sorted(top_bowlers, key=lambda x: x['runs'], reverse=True)[:5]
+        bowler_rows.sort(key=lambda x: x['_score'], reverse=True)
+        strip = lambda rows: [{k: v for k, v in r.items() if k != '_score'} for r in rows]
+        good_vs_bowlers = strip(bowler_rows[:10])
+        bad_vs_bowlers  = strip(list(reversed(bowler_rows[-10:])))
 
-        # Attach RHB/LHB career stats for each top bowler
-        for b in top_bowlers:
-            bowler_df = self.df[self.df['bowl'] == b['bowler']]
+        # Good/bad bowling styles (min balls)
+        style_rows = [s for s in by_style if s['balls'] >= MIN_BALLS_STYLE]
+        style_rows.sort(key=lambda x: self._batter_score(x['strike_rate'], x['dismissal_rate']), reverse=True)
+        good_vs_styles = style_rows[:5]
+        bad_vs_styles  = list(reversed(style_rows[-5:]))
+
+        # ── AS BOWLER ──────────────────────────────────────────────
+        bowl_df = self.df[self.df['bowl'] == player_name]
+        bowler_section = {}
+
+        if not bowl_df.empty:
+            batter_rows = []
+            for batter, group in bowl_df.groupby('bat'):
+                balls = int(group['ballfaced'].sum())
+                if balls < MIN_BALLS_BOWLER:
+                    continue
+                runs     = int(group['bowlruns'].sum())
+                wickets  = int(group['is_out'].sum())
+                economy  = round(runs / balls * 6, 2) if balls > 0 else 0
+                sr       = round(runs / balls * 100, 2) if balls > 0 else 0
+                avg      = round(runs / wickets, 2) if wickets > 0 else runs
+                batter_rows.append({"batter": batter, "runs_conceded": runs, "balls": balls,
+                                    "wickets": wickets, "economy": economy,
+                                    "strike_rate": sr, "average": avg,
+                                    "_score": self._bowler_score(economy, balls, wickets)})
+
+            batter_rows.sort(key=lambda x: x['_score'], reverse=True)
+            bowler_section['good_vs_batters'] = strip(batter_rows[:10])
+            bowler_section['bad_vs_batters']  = strip(list(reversed(batter_rows[-10:])))
+
             vs_hand = {}
-            for hand, hgroup in bowler_df[bowler_df['bat_hand'].isin(['RHB', 'LHB'])].groupby('bat_hand'):
-                hballs = int(hgroup['ballfaced'].sum())
-                hruns = int(hgroup['bowlruns'].sum())
-                hwickets = int(hgroup['is_out'].sum())
+            for hand, hgroup in bowl_df[bowl_df['bat_hand'].isin(['RHB', 'LHB'])].groupby('bat_hand'):
+                hb = int(hgroup['ballfaced'].sum())
+                hr = int(hgroup['bowlruns'].sum())
+                hw = int(hgroup['is_out'].sum())
                 vs_hand[hand] = {
-                    "runs_conceded": hruns,
-                    "balls": hballs,
-                    "wickets": hwickets,
-                    "strike_rate": round(hruns / hballs * 100, 2) if hballs > 0 else 0,
-                    "average": round(hruns / hwickets, 2) if hwickets > 0 else hruns,
-                    "economy": round(hruns / hballs * 6, 2) if hballs > 0 else 0
+                    "runs_conceded": hr, "balls": hb, "wickets": hw,
+                    "strike_rate": round(hr / hb * 100, 2) if hb > 0 else 0,
+                    "average":     round(hr / hw, 2) if hw > 0 else hr,
+                    "economy":     round(hr / hb * 6, 2) if hb > 0 else 0,
                 }
-            b['vs_hand'] = vs_hand
+            bowler_section['vs_hand'] = vs_hand
 
         return {
-            "by_type": matchups,
-            "by_style": by_style,
-            "top_bowlers": top_bowlers
+            "by_type":         by_type,
+            "by_style":        by_style,
+            "batter": {
+                "good_vs_bowlers": good_vs_bowlers,
+                "bad_vs_bowlers":  bad_vs_bowlers,
+                "good_vs_styles":  good_vs_styles,
+                "bad_vs_styles":   bad_vs_styles,
+            },
+            "bowler": bowler_section,
         }
 
     def get_dismissals(self, player_name: str):
