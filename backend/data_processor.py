@@ -172,6 +172,37 @@ class DataProcessor:
             "balls": [{"x": int(b['wagonX']), "y": int(b['wagonY']), "runs": int(b['batruns'])} for b in balls]
         }
 
+    def get_wicket_shots(self, player_name: str):
+        player_df = self.df[self.df['bat'] == player_name]
+        if player_df.empty:
+            return None
+
+        dismissals = player_df[
+            (player_df['is_out'] == 1) &
+            (player_df['shot'].notna()) &
+            (player_df['shot'] != '') &
+            (~player_df['bowl_style'].isin(MIXED_STYLES)) &
+            (player_df['bowl_style'] != '')
+        ]
+
+        # shot × bowl_style dismissal counts
+        heatmap = dismissals.groupby(['shot', 'bowl_style']).size().reset_index(name='count')
+        heatmap_list = heatmap.to_dict('records')
+
+        # Top dismissal shots overall
+        by_shot = dismissals['shot'].value_counts().head(10).to_dict()
+        shot_list = [{"shot": k, "count": int(v)} for k, v in by_shot.items()]
+
+        # Top dismissal bowl styles
+        by_style = dismissals['bowl_style'].value_counts().to_dict()
+        style_list = [{"style": k, "count": int(v)} for k, v in by_style.items()]
+
+        return {
+            "heatmap": heatmap_list,
+            "by_shot": shot_list,
+            "by_style": style_list
+        }
+
     def get_graph_data(self, player_name: str):
         player_df = self.df[self.df['bat'] == player_name]
         if player_df.empty:

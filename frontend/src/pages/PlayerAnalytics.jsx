@@ -31,6 +31,7 @@ const PlayerAnalytics = () => {
   const [dismissals, setDismissals] = useState([]);
   const [zones, setZones] = useState([]);
   const [wagonBalls, setWagonBalls] = useState([]);
+  const [wicketShots, setWicketShots] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -46,13 +47,15 @@ const PlayerAnalytics = () => {
         fetch(`${API_BASE}/player/${playerName}/career`).then(res => res.json()),
         fetch(`${API_BASE}/player/${playerName}/matchups`).then(res => res.json()),
         fetch(`${API_BASE}/player/${playerName}/dismissals`).then(res => res.json()),
-        fetch(`${API_BASE}/player/${playerName}/zones`).then(res => res.json())
-      ]).then(([careerData, matchupsData, dismissalsData, zonesData]) => {
+        fetch(`${API_BASE}/player/${playerName}/zones`).then(res => res.json()),
+        fetch(`${API_BASE}/player/${playerName}/wicket-shots`).then(res => res.json()),
+      ]).then(([careerData, matchupsData, dismissalsData, zonesData, wicketShotsData]) => {
         setCareer(careerData);
         setMatchups(matchupsData);
         setDismissals(dismissalsData);
         setZones(zonesData?.zones ?? zonesData ?? []);
         setWagonBalls(zonesData?.balls ?? []);
+        setWicketShots(wicketShotsData);
         setLoading(false);
       }).catch(err => {
         console.error(err);
@@ -299,6 +302,108 @@ const PlayerAnalytics = () => {
               </div>
             </motion.div>
           </div>
+
+          {/* Wicket Shots vs Bowler Style */}
+          {wicketShots && (
+            <motion.div variants={itemVariants} className="glass-morphism rounded-[2.5rem] p-10">
+              <h3 className="text-xl font-display font-bold mb-2">Dismissal Heatmap</h3>
+              <p className="text-slate-400 text-xs mb-8 uppercase tracking-widest font-bold opacity-60">
+                Wicket Shots vs Bowling Style
+              </p>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                {/* Shot breakdown */}
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4">Top Dismissal Shots</p>
+                  <div className="space-y-2">
+                    {wicketShots.by_shot?.map((s) => {
+                      const max = wicketShots.by_shot[0]?.count || 1;
+                      return (
+                        <div key={s.shot} className="flex items-center gap-3">
+                          <span className="text-xs text-slate-400 w-44 truncate font-medium">{s.shot.replace(/_/g, ' ')}</span>
+                          <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-rose-500 rounded-full"
+                              style={{ width: `${(s.count / max) * 100}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-bold text-rose-400 w-6 text-right">{s.count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Style breakdown */}
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4">Dismissals by Bowling Style</p>
+                  <div className="space-y-2">
+                    {wicketShots.by_style?.map((s) => {
+                      const max = wicketShots.by_style[0]?.count || 1;
+                      return (
+                        <div key={s.style} className="flex items-center gap-3">
+                          <span className="text-xs text-slate-400 w-12 font-bold">{s.style}</span>
+                          <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-indigo-500 rounded-full"
+                              style={{ width: `${(s.count / max) * 100}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-bold text-indigo-400 w-6 text-right">{s.count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Heatmap table */}
+                <div className="lg:col-span-2">
+                  <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4">Shot × Style Matrix</p>
+                  <div className="overflow-x-auto">
+                    <table className="text-xs w-full">
+                      <thead>
+                        <tr className="border-b border-white/5">
+                          <th className="pb-3 px-3 text-left text-slate-500 font-bold">Shot</th>
+                          {[...new Set(wicketShots.heatmap?.map(h => h.bowl_style))].sort().map(style => (
+                            <th key={style} className="pb-3 px-3 text-center text-slate-500 font-bold">{style}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...new Set(wicketShots.heatmap?.map(h => h.shot))].map(shot => {
+                          const rowData = wicketShots.heatmap?.filter(h => h.shot === shot);
+                          const styles = [...new Set(wicketShots.heatmap?.map(h => h.bowl_style))].sort();
+                          return (
+                            <tr key={shot} className="border-b border-white/5 hover:bg-white/[0.02]">
+                              <td className="py-3 px-3 font-medium text-slate-300">{shot.replace(/_/g, ' ')}</td>
+                              {styles.map(style => {
+                                const cell = rowData.find(h => h.bowl_style === style);
+                                const count = cell?.count || 0;
+                                const intensity = count > 0 ? Math.min(count / 5, 1) : 0;
+                                return (
+                                  <td key={style} className="py-3 px-3 text-center">
+                                    {count > 0 ? (
+                                      <span
+                                        className="inline-block w-7 h-7 rounded-lg text-white font-bold leading-7"
+                                        style={{ backgroundColor: `rgba(239,68,68,${0.15 + intensity * 0.75})` }}
+                                      >
+                                        {count}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-700">—</span>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
         </motion.main>
 
         <footer className="mt-20 pt-10 border-t border-slate-900 flex justify-between items-center text-slate-500 text-xs font-semibold uppercase tracking-[0.2em]">
